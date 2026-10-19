@@ -204,8 +204,22 @@ async function submit(){
       closeForm();closeView();render();toast("Vote saved (preview mode) ✓");
     }
   }catch(e){
-    m.hidden=false;m.className="msg err";m.textContent="Couldn’t reach the voting server. Please try again.";
-    b.disabled=false;b.textContent="Submit my vote";
+    /* fallback: the reply may be blocked by the browser even though the vote went through. Send once more without reading the reply, then ask the sheet. */
+    let ok=false;
+    try{
+      await fetch(SHEET_URL,{method:"POST",mode:"no-cors",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({design:pick+1,token})});
+      await new Promise(r=>setTimeout(r,1800));
+      const r2=await fetch(SHEET_URL+"?token="+encodeURIComponent(token)+"&t="+Date.now(),{cache:"no-store"});
+      const d2=await r2.json();
+      if(Array.isArray(d2.counts)){counts=Array(N).fill(0).map((_,i)=>+d2.counts[i]||0);serverClosed=!!d2.closed}
+      if(d2.mine>=1&&d2.mine<=N){myVote=d2.mine-1;store("adtmShirtVote",String(d2.mine));ok=true}
+    }catch(e2){}
+    if(ok){closeForm();closeView();render();toast("Vote recorded for "+name(myVote)+" ✓")}
+    else{
+      m.hidden=false;m.className="msg err";
+      m.textContent="Couldn’t reach the voting server. The voting link may not be set to “Anyone”. Please tell the organizer.";
+      b.disabled=false;b.textContent="Try again";
+    }
   }
   busy=false;
 }
