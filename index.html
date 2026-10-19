@@ -130,7 +130,9 @@ let counts=Array(N).fill(0),serverClosed=false,loaded=false,err="",cur=0,pick=0,
 function store(k,v){try{if(v===undefined)return localStorage.getItem(k);localStorage.setItem(k,v)}catch(e){return null}}
 let token=store("adtmShirtToken");
 if(!token){token=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Math.random()).slice(2)+Date.now();store("adtmShirtToken",token)}
-const saved=parseInt(store("adtmShirtVote"),10);if(saved>=1&&saved<=N)myVote=saved-1;
+/* once the link is live, only the server decides who has voted: test votes made in preview mode are ignored */
+if(live){store("adtmShirtVote","");store("adtmDemoCounts","")}
+const saved=live?NaN:parseInt(store("adtmShirtVote"),10);if(saved>=1&&saved<=N)myVote=saved-1;
 if(!live){try{const c=JSON.parse(store("adtmDemoCounts")||"null");if(Array.isArray(c)&&c.length===N)counts=c}catch(e){}loaded=true}
 
 const closed=()=>serverClosed||Date.now()>=DEADLINE;
@@ -174,7 +176,7 @@ async function load(){
     const r=await fetch(SHEET_URL+(SHEET_URL.includes("?")?"&":"?")+"token="+encodeURIComponent(token)+"&t="+Date.now(),{cache:"no-store"});
     const d=await r.json();
     if(Array.isArray(d.counts)){counts=Array(N).fill(0).map((_,i)=>+d.counts[i]||0);serverClosed=!!d.closed;loaded=true;err="";
-      if(d.mine>=1&&d.mine<=N&&myVote<0){myVote=d.mine-1;store("adtmShirtVote",String(d.mine))}}
+      myVote=(d.mine>=1&&d.mine<=N)?d.mine-1:-1;store("adtmShirtVote",myVote>=0?String(myVote+1):"")}
   }catch(e){if(!loaded)err="Couldn’t load votes. Check your connection."}
   render();
 }
@@ -248,6 +250,7 @@ function tick(){
 }
 setInterval(tick,1000);tick();
 render();load();setInterval(load,10000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)load()});
 </script>
 </body>
 </html>
